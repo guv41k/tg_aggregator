@@ -26,7 +26,10 @@ ZIP_SIZE_LIMIT = 50 * 1024 * 1024  # 50 МБ — лимит Telegram Bot API
 CB_CHATS = "chats"
 CB_EXPORT = "export"
 CB_CANCEL = "cancel"
+CB_BACK = "back"
 CB_CHAT_PREFIX = "chat:"
+
+MAIN_MENU_TEXT = "Привет, администратор! Выберите действие:"
 
 # Состояния диалога выгрузки
 SELECT_CHAT, ENTER_DATE_FROM, ENTER_DATE_TO = range(3)
@@ -37,6 +40,17 @@ def _main_menu() -> InlineKeyboardMarkup:
         InlineKeyboardButton("📋 Список чатов", callback_data=CB_CHATS),
         InlineKeyboardButton("📤 Выгрузка", callback_data=CB_EXPORT),
     ]])
+
+
+def _chats_menu() -> InlineKeyboardMarkup:
+    """Меню под списком чатов — с кнопкой выхода."""
+    return InlineKeyboardMarkup([
+        [
+            InlineKeyboardButton("📋 Список чатов", callback_data=CB_CHATS),
+            InlineKeyboardButton("📤 Выгрузка", callback_data=CB_EXPORT),
+        ],
+        [InlineKeyboardButton("← Назад", callback_data=CB_BACK)],
+    ])
 
 
 def _cancel_button() -> InlineKeyboardMarkup:
@@ -51,10 +65,7 @@ def _is_admin(update: Update) -> bool:
 # ── /start ────────────────────────────────────────────────────────────────────
 
 async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    await update.message.reply_text(
-        "Привет, администратор! Выберите действие:",
-        reply_markup=_main_menu(),
-    )
+    await update.message.reply_text(MAIN_MENU_TEXT, reply_markup=_main_menu())
 
 
 # ── Список чатов (кнопка «📋 Список чатов») ──────────────────────────────────
@@ -76,14 +87,14 @@ async def cb_show_chats(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
             return
 
     if not chats:
-        await query.edit_message_text("Пока ни одного чата не отслеживается.", reply_markup=_main_menu())
+        await query.edit_message_text("Пока ни одного чата не отслеживается.", reply_markup=_chats_menu())
         return
 
     lines = ["<b>Отслеживаемые чаты:</b>"]
     for chat in chats:
         lines.append(f"• <b>{chat.title or '—'}</b> | id: <code>{chat.id}</code> | тип: {chat.type}")
 
-    await query.edit_message_text("\n".join(lines), parse_mode="HTML", reply_markup=_main_menu())
+    await query.edit_message_text("\n".join(lines), parse_mode="HTML", reply_markup=_chats_menu())
 
 
 # ── Диалог выгрузки ───────────────────────────────────────────────────────────
@@ -238,11 +249,19 @@ async def msg_date_to(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int
     return ConversationHandler.END
 
 
+async def cb_back(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Кнопка «← Назад» — возвращает на главный экран."""
+    query = update.callback_query
+    await query.answer()
+    await query.edit_message_text(MAIN_MENU_TEXT, reply_markup=_main_menu())
+
+
 async def cb_cancel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """Кнопка «❌ Отмена» внутри диалога — завершает и возвращает на главный экран."""
     query = update.callback_query
     await query.answer()
     context.user_data.clear()
-    await query.edit_message_text("Отменено. Выберите действие:", reply_markup=_main_menu())
+    await query.edit_message_text(MAIN_MENU_TEXT, reply_markup=_main_menu())
     return ConversationHandler.END
 
 
@@ -253,6 +272,7 @@ def build_admin_app() -> Application:
 
     app.add_handler(CommandHandler("start", cmd_start, filters=admin_filter))
     app.add_handler(CallbackQueryHandler(cb_show_chats, pattern=f"^{CB_CHATS}$"))
+    app.add_handler(CallbackQueryHandler(cb_back, pattern=f"^{CB_BACK}$"))
 
     app.add_handler(ConversationHandler(
         entry_points=[CallbackQueryHandler(cb_start_export, pattern=f"^{CB_EXPORT}$")],
