@@ -164,6 +164,11 @@ async def handle_reaction(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     old_emojis = [r.emoji for r in (reaction_update.old_reaction or []) if hasattr(r, "emoji")]
     new_emojis = [r.emoji for r in (reaction_update.new_reaction or []) if hasattr(r, "emoji")]
 
+    logger.info(
+        "Получено обновление реакции: chat_id=%s, message_id=%s, old=%s, new=%s",
+        chat_id, message_id, old_emojis, new_emojis,
+    )
+
     with SessionLocal() as session:
         try:
             update_message_reactions(session, chat_id, message_id, old_emojis, new_emojis)
