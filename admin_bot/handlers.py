@@ -71,28 +71,34 @@ async def cmd_export(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
         )
         return
 
-    with SessionLocal() as session:
-        try:
+    try:
+        with SessionLocal() as session:
             messages = get_messages_by_period(session, chat_id, date_from, date_to)
-        except Exception:
-            logger.exception("Ошибка при выгрузке сообщений chat_id=%s", chat_id)
-            await update.message.reply_text("Ошибка при обращении к базе данных.")
-            return
-
-    if not messages:
-        await update.message.reply_text(
-            f"За период {args[1]} — {args[2]} сообщений в чате {chat_id} не найдено."
-        )
+            if not messages:
+                await update.message.reply_text(
+                    f"За период {args[1]} — {args[2]} сообщений в чате {chat_id} не найдено."
+                )
+                return
+            # format_messages обращается к message.user — вызываем пока сессия открыта
+            text = format_messages(messages, chat_id, date_from, date_to)
+    except Exception:
+        logger.exception("Ошибка при выгрузке сообщений chat_id=%s", chat_id)
+        await update.message.reply_text("Не удалось сформировать выгрузку. Подробности в логах сервера.")
         return
 
-    text = format_messages(messages, chat_id, date_from, date_to)
     file_name = f"export_{chat_id}_{args[1]}_{args[2]}.txt"
 
-    await update.message.reply_document(
-        document=BytesIO(text.encode("utf-8")),
-        filename=file_name,
-        caption=f"Выгрузка: {len(messages)} сообщ. | {args[1]} — {args[2]}",
-    )
+    try:
+        await update.message.reply_document(
+            document=BytesIO(text.encode("utf-8")),
+            filename=file_name,
+            caption=f"Выгрузка: {len(messages)} сообщ. | {args[1]} — {args[2]}",
+        )
+    except Exception:
+        logger.exception("Ошибка при отправке файла выгрузки chat_id=%s", chat_id)
+        await update.message.reply_text("Не удалось отправить файл. Подробности в логах сервера.")
+        return
+
     logger.info(
         "Администратор %s запросил выгрузку chat_id=%s (%s — %s), %d сообщений",
         update.effective_user.id,

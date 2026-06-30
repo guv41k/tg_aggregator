@@ -1,7 +1,7 @@
 import logging
 from datetime import datetime
 
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 
 from db.models import Chat, Message, User
 
@@ -78,6 +78,7 @@ def get_messages_by_period(
     try:
         return (
             session.query(Message)
+            .options(selectinload(Message.user))
             .filter(
                 Message.chat_id == chat_id,
                 Message.timestamp >= date_from,
