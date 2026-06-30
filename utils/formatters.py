@@ -11,26 +11,19 @@ def format_messages(
     date_to: datetime,
     filename_only: bool = False,
 ) -> str:
-    """Форматировать список сообщений в текст для выгрузки.
-
-    filename_only=True — в теле сообщения выводить только имя файла без пути
-    (используется при сборке ZIP, где файлы лежат рядом).
-    """
+    """Форматировать сообщения для выгрузки. filename_only=True — имя файла вместо полного пути."""
     header = (
         f"Выгрузка переписки\n"
         f"Чат: {chat_id}\n"
-        f"Период: {date_from.strftime('%Y-%m-%d')} — {date_to.strftime('%Y-%m-%d')}\n"
+        f"Период: {date_from:%Y-%m-%d} — {date_to:%Y-%m-%d}\n"
         f"Сообщений: {len(messages)}\n"
         f"{'=' * 60}\n\n"
     )
 
     lines = []
     for msg in messages:
-        ts = msg.timestamp.strftime("%Y-%m-%d %H:%M:%S")
-
         if msg.user and (msg.user.first_name or msg.user.username):
-            name_parts = [msg.user.first_name, msg.user.last_name]
-            full_name = " ".join(p for p in name_parts if p)
+            full_name = " ".join(p for p in [msg.user.first_name, msg.user.last_name] if p)
             sender = f"{full_name} (@{msg.user.username})" if msg.user.username else full_name
         else:
             sender = f"user_id:{msg.user_id}" if msg.user_id else "Неизвестно"
@@ -46,7 +39,7 @@ def format_messages(
         else:
             body = "[медиа]"
 
-        line = f"[{ts}] {sender}:\n{body}"
+        line = f"[{msg.timestamp:%Y-%m-%d %H:%M:%S}] {sender}:\n{body}"
 
         if msg.reactions:
             parts = [

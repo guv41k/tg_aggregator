@@ -31,7 +31,6 @@ CB_CHAT_PREFIX = "chat:"
 
 MAIN_MENU_TEXT = "Привет, администратор! Выберите действие:"
 
-# Состояния диалога выгрузки
 SELECT_CHAT, ENTER_DATE_FROM, ENTER_DATE_TO = range(3)
 
 
@@ -43,7 +42,6 @@ def _main_menu() -> InlineKeyboardMarkup:
 
 
 def _chats_menu() -> InlineKeyboardMarkup:
-    """Меню под списком чатов — с кнопкой выхода."""
     return InlineKeyboardMarkup([
         [
             InlineKeyboardButton("📋 Список чатов", callback_data=CB_CHATS),
@@ -181,8 +179,8 @@ async def msg_date_to(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int
         )
         return ENTER_DATE_TO
 
-    chat_id: int = context.user_data["export_chat_id"]
-    date_from: datetime = context.user_data["export_date_from"]
+    chat_id = context.user_data["export_chat_id"]
+    date_from = context.user_data["export_date_from"]
     date_from_str = date_from.strftime("%Y-%m-%d")
 
     await update.message.reply_text("⏳ Формирую архив...")
@@ -250,14 +248,12 @@ async def msg_date_to(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int
 
 
 async def cb_back(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Кнопка «← Назад» — возвращает на главный экран."""
     query = update.callback_query
     await query.answer()
     await query.edit_message_text(MAIN_MENU_TEXT, reply_markup=_main_menu())
 
 
 async def cb_cancel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    """Кнопка «❌ Отмена» внутри диалога — завершает и возвращает на главный экран."""
     query = update.callback_query
     await query.answer()
     context.user_data.clear()

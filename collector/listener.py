@@ -3,7 +3,7 @@ import pathlib
 from datetime import datetime
 
 from telegram import Bot, Update, Message as TGMessage
-from telegram.ext import Application, MessageHandler, filters, ContextTypes
+from telegram.ext import Application, MessageHandler, MessageReactionHandler, filters, ContextTypes
 
 from config import COLLECTOR_TOKEN
 from db.crud import save_message, upsert_chat, upsert_user, update_message_reactions
@@ -24,7 +24,6 @@ MEDIA_EXTENSIONS = {
 
 
 def _extract_media(message: TGMessage) -> tuple[str | None, str | None]:
-    """Определить тип медиафайла и его file_id."""
     if message.photo:
         return "photo", message.photo[-1].file_id
     if message.document:
@@ -49,12 +48,7 @@ async def download_media(
     file_id: str,
     chat_id: int,
 ) -> str | None:
-    """Скачать медиафайл через Bot API и вернуть относительный путь к нему.
-
-    Возвращает None если скачивание не удалось (файл > 20 МБ, сетевая ошибка и т.д.).
-    """
     try:
-        # Определяем расширение: для document/audio берём оригинальное имя файла
         if media_type == "document" and message.document and message.document.file_name:
             ext = pathlib.Path(message.document.file_name).suffix or ".bin"
         elif media_type == "audio" and message.audio and message.audio.file_name:
@@ -72,7 +66,6 @@ async def download_media(
         tg_file = await bot.get_file(file_id)
         await tg_file.download_to_drive(dest_path)
 
-        # Возвращаем путь с прямыми слешами для единообразия
         relative_path = dest_path.as_posix()
         logger.info("Скачан файл: %s", relative_path)
         return relative_path
@@ -89,7 +82,6 @@ async def download_media(
 
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Обработчик входящих сообщений: сохраняет пользователя, чат и сообщение в БД."""
     message = update.effective_message
     chat = update.effective_chat
     user = update.effective_user
@@ -99,8 +91,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
 
     media_type, file_id = _extract_media(message)
 
-    # Скачиваем файл пока ещё есть доступ к боту через context
-    file_path: str | None = None
+    file_path = None
     if media_type and file_id:
         file_path = await download_media(context.bot, message, media_type, file_id, chat.id)
 
@@ -152,7 +143,6 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
 
 
 async def handle_reaction(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Обработчик MessageReactionUpdated: обновляет счётчики реакций в БД."""
     reaction_update = update.message_reaction
     if reaction_update is None:
         return
@@ -164,8 +154,8 @@ async def handle_reaction(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     old_emojis = [r.emoji for r in (reaction_update.old_reaction or []) if hasattr(r, "emoji")]
     new_emojis = [r.emoji for r in (reaction_update.new_reaction or []) if hasattr(r, "emoji")]
 
-    logger.info(
-        "Получено обновление реакции: chat_id=%s, message_id=%s, old=%s, new=%s",
+    logger.debug(
+        "Реакция: chat_id=%s, message_id=%s, old=%s, new=%s",
         chat_id, message_id, old_emojis, new_emojis,
     )
 
@@ -181,19 +171,8 @@ async def handle_reaction(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
 
 
 def build_collector_app() -> Application:
-    """Собрать и вернуть приложение бота-сборщика."""
-    app = (
-        Application.builder()
-        .token(COLLECTOR_TOKEN)
-        .build()
-    )
-
-    app.add_handler(
-        MessageHandler(filters.ALL, handle_message)
-    )
-
-    from telegram.ext import MessageReactionHandler
+    app = Application.builder().token(COLLECTOR_TOKEN).build()
+    app.add_handler(MessageHandler(filters.ALL, handle_message))
     app.add_handler(MessageReactionHandler(handle_reaction))
-
     logger.info("Бот-сборщик инициализирован")
     return app

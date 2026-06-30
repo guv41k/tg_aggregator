@@ -13,7 +13,6 @@ SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False)
 
 
 def init_db() -> None:
-    """Создать все таблицы в базе данных."""
     try:
         from db import models  # noqa: F401 — регистрирует модели в Base.metadata
         Base.metadata.create_all(bind=engine)

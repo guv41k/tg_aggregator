@@ -10,7 +10,6 @@ logger = logging.getLogger(__name__)
 
 
 def upsert_user(session: Session, user_data: dict) -> User:
-    """Создать или обновить запись пользователя."""
     try:
         user = session.get(User, user_data["id"])
         if user is None:
@@ -28,7 +27,6 @@ def upsert_user(session: Session, user_data: dict) -> User:
 
 
 def upsert_chat(session: Session, chat_data: dict) -> Chat:
-    """Создать или обновить запись чата."""
     try:
         chat = session.get(Chat, chat_data["id"])
         if chat is None:
@@ -45,7 +43,7 @@ def upsert_chat(session: Session, chat_data: dict) -> Chat:
 
 
 def save_message(session: Session, message_data: dict) -> Message:
-    """Сохранить сообщение. Если уже существует — пропустить."""
+    """Пропускает сообщение если уже сохранено (idempotent)."""
     try:
         msg = session.get(Message, message_data["id"])
         if msg is not None:
@@ -76,7 +74,6 @@ def get_messages_by_period(
     date_from: datetime,
     date_to: datetime,
 ) -> list[Message]:
-    """Вернуть список сообщений чата за указанный период."""
     try:
         return (
             session.query(Message)
@@ -101,10 +98,7 @@ def update_message_reactions(
     old_emojis: list[str],
     new_emojis: list[str],
 ) -> None:
-    """Обновить реакции сообщения с учётом delta: убрать old_emojis, добавить new_emojis.
-
-    Реакции хранятся как [{"emoji": "🔥", "count": N}].
-    """
+    """Delta-обновление: убрать old_emojis, добавить new_emojis. Формат: [{"emoji": "🔥", "count": N}]."""
     try:
         msg = (
             session.query(Message)
@@ -119,7 +113,7 @@ def update_message_reactions(
             )
             return
 
-        counts: dict[str, int] = {
+        counts = {
             r["emoji"]: r["count"]
             for r in (msg.reactions or [])
             if isinstance(r, dict)
@@ -146,7 +140,6 @@ def update_message_reactions(
 
 
 def get_all_chats(session: Session) -> list[Chat]:
-    """Вернуть все зарегистрированные чаты."""
     try:
         return session.query(Chat).order_by(Chat.title).all()
     except Exception:

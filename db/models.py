@@ -8,7 +8,7 @@ from db.session import Base
 class User(Base):
     __tablename__ = "users"
 
-    id = Column(BigInteger, primary_key=True)  # Telegram user_id
+    id = Column(BigInteger, primary_key=True)
     username = Column(String(255), nullable=True)
     first_name = Column(String(255), nullable=True)
     last_name = Column(String(255), nullable=True)
@@ -19,7 +19,7 @@ class User(Base):
 class Chat(Base):
     __tablename__ = "chats"
 
-    id = Column(BigInteger, primary_key=True)  # Telegram chat_id
+    id = Column(BigInteger, primary_key=True)
     title = Column(String(255), nullable=True)
     type = Column(String(50), nullable=True)  # private, group, supergroup, channel
 
@@ -35,7 +35,7 @@ class Message(Base):
     text = Column(Text, nullable=True)
     media_type = Column(String(50), nullable=True)   # photo, document, video, …
     file_id = Column(String(512), nullable=True)
-    file_path = Column(String(1024), nullable=True)  # локальный путь к скачанному файлу
+    file_path = Column(String(1024), nullable=True)
     reactions = Column(JSON, nullable=True)
     timestamp = Column(DateTime, nullable=False, default=datetime.utcnow)
 
