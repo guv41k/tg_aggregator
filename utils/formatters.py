@@ -29,7 +29,15 @@ def format_messages(
         else:
             sender = f"user_id:{msg.user_id}" if msg.user_id else "Неизвестно"
 
-        body = msg.text or f"[{msg.media_type or 'медиа'}]"
+        if msg.text:
+            body = msg.text
+        elif msg.media_type:
+            if msg.file_path:
+                body = f"[{msg.media_type}: {msg.file_path}]"
+            else:
+                body = f"[{msg.media_type} (файл недоступен)]"
+        else:
+            body = "[медиа]"
 
         line = f"[{ts}] {sender}:\n{body}"
 

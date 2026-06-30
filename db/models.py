@@ -35,6 +35,7 @@ class Message(Base):
     text = Column(Text, nullable=True)
     media_type = Column(String(50), nullable=True)   # photo, document, video, …
     file_id = Column(String(512), nullable=True)
+    file_path = Column(String(1024), nullable=True)  # локальный путь к скачанному файлу
     reactions = Column(JSON, nullable=True)
     timestamp = Column(DateTime, nullable=False, default=datetime.utcnow)
 

@@ -56,6 +56,7 @@ def save_message(session: Session, message_data: dict) -> Message:
             text=message_data.get("text"),
             media_type=message_data.get("media_type"),
             file_id=message_data.get("file_id"),
+            file_path=message_data.get("file_path"),
             reactions=message_data.get("reactions"),
             timestamp=message_data.get("timestamp", datetime.utcnow()),
         )
