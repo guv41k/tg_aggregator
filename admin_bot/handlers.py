@@ -1,4 +1,6 @@
 import logging
+import pathlib
+import zipfile
 from datetime import datetime
 from io import BytesIO
 
@@ -14,6 +16,8 @@ from utils.formatters import format_messages
 logger = logging.getLogger(__name__)
 
 admin_filter = AdminFilter()
+
+ZIP_SIZE_LIMIT = 50 * 1024 * 1024  # 50 МБ — лимит Telegram Bot API
 
 
 async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -48,7 +52,7 @@ async def cmd_chats(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
 
 async def cmd_export(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Выгрузить переписку чата за период.
+    """Выгрузить переписку чата за период в виде ZIP-архива.
 
     Использование: /export <chat_id> <YYYY-MM-DD> <YYYY-MM-DD>
     """
@@ -79,24 +83,49 @@ async def cmd_export(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
                     f"За период {args[1]} — {args[2]} сообщений в чате {chat_id} не найдено."
                 )
                 return
-            # format_messages обращается к message.user — вызываем пока сессия открыта
-            text = format_messages(messages, chat_id, date_from, date_to)
+            # format_messages обращается к message.user — вызываем пока сессия открыта.
+            # filename_only=True: в тексте будет только имя файла, сам файл будет в media/ архива.
+            text = format_messages(messages, chat_id, date_from, date_to, filename_only=True)
+            file_paths = [msg.file_path for msg in messages]
+            msg_count = len(messages)
     except Exception:
         logger.exception("Ошибка при выгрузке сообщений chat_id=%s", chat_id)
         await update.message.reply_text("Не удалось сформировать выгрузку. Подробности в логах сервера.")
         return
 
-    file_name = f"export_{chat_id}_{args[1]}_{args[2]}.txt"
+    # Собираем ZIP в памяти
+    zip_buffer = BytesIO()
+    with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zf:
+        zf.writestr("export.txt", text.encode("utf-8"))
+        for fp in file_paths:
+            if not fp:
+                continue
+            local_path = pathlib.Path(fp)
+            if local_path.exists():
+                zf.write(local_path, arcname=f"media/{local_path.name}")
+            else:
+                logger.warning("Медиафайл не найден на диске: %s", fp)
+
+    zip_size = zip_buffer.tell()
+    if zip_size > ZIP_SIZE_LIMIT:
+        await update.message.reply_text(
+            f"Архив слишком большой ({zip_size // 1024 // 1024} МБ > 50 МБ). "
+            "Сократите период выгрузки и попробуйте снова."
+        )
+        return
+
+    zip_buffer.seek(0)
+    zip_name = f"export_{chat_id}_{args[1]}_{args[2]}.zip"
 
     try:
         await update.message.reply_document(
-            document=BytesIO(text.encode("utf-8")),
-            filename=file_name,
-            caption=f"Выгрузка: {len(messages)} сообщ. | {args[1]} — {args[2]}",
+            document=zip_buffer,
+            filename=zip_name,
+            caption=f"Выгрузка: {msg_count} сообщ. | {args[1]} — {args[2]}",
         )
     except Exception:
-        logger.exception("Ошибка при отправке файла выгрузки chat_id=%s", chat_id)
-        await update.message.reply_text("Не удалось отправить файл. Подробности в логах сервера.")
+        logger.exception("Ошибка при отправке архива выгрузки chat_id=%s", chat_id)
+        await update.message.reply_text("Не удалось отправить архив. Подробности в логах сервера.")
         return
 
     logger.info(
@@ -105,7 +134,7 @@ async def cmd_export(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
         chat_id,
         args[1],
         args[2],
-        len(messages),
+        msg_count,
     )
 
 

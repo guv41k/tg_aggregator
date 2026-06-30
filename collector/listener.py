@@ -6,7 +6,7 @@ from telegram import Bot, Update, Message as TGMessage
 from telegram.ext import Application, MessageHandler, filters, ContextTypes
 
 from config import COLLECTOR_TOKEN
-from db.crud import save_message, upsert_chat, upsert_user
+from db.crud import save_message, upsert_chat, upsert_user, update_message_reactions
 from db.session import SessionLocal
 
 logger = logging.getLogger(__name__)
@@ -152,27 +152,26 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
 
 
 async def handle_reaction(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Обработчик обновлений реакций: дописывает реакции в поле reactions сообщения."""
+    """Обработчик MessageReactionUpdated: обновляет счётчики реакций в БД."""
     reaction_update = update.message_reaction
     if reaction_update is None:
         return
 
-    new_reactions = [r.emoji for r in (reaction_update.new_reaction or [])]
+    chat_id = reaction_update.chat.id
+    message_id = reaction_update.message_id
+
+    # Фильтруем только emoji-реакции (бывают ещё кастомные)
+    old_emojis = [r.emoji for r in (reaction_update.old_reaction or []) if hasattr(r, "emoji")]
+    new_emojis = [r.emoji for r in (reaction_update.new_reaction or []) if hasattr(r, "emoji")]
 
     with SessionLocal() as session:
         try:
-            from db.models import Message
-            msg = session.get(Message, reaction_update.message_id)
-            if msg is not None:
-                existing: list = msg.reactions or []
-                merged = list(set(existing + new_reactions))
-                msg.reactions = merged
-                session.commit()
+            update_message_reactions(session, chat_id, message_id, old_emojis, new_emojis)
         except Exception:
-            session.rollback()
             logger.exception(
-                "Не удалось обновить реакции для сообщения %s",
-                reaction_update.message_id,
+                "Не удалось обновить реакции для сообщения %s в чате %s",
+                message_id,
+                chat_id,
             )
 
 

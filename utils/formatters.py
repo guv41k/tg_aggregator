@@ -1,3 +1,4 @@
+import pathlib
 from datetime import datetime
 
 from db.models import Message
@@ -8,8 +9,13 @@ def format_messages(
     chat_id: int,
     date_from: datetime,
     date_to: datetime,
+    filename_only: bool = False,
 ) -> str:
-    """Форматировать список сообщений в текстовый файл для выгрузки."""
+    """Форматировать список сообщений в текст для выгрузки.
+
+    filename_only=True — в теле сообщения выводить только имя файла без пути
+    (используется при сборке ZIP, где файлы лежат рядом).
+    """
     header = (
         f"Выгрузка переписки\n"
         f"Чат: {chat_id}\n"
@@ -33,7 +39,8 @@ def format_messages(
             body = msg.text
         elif msg.media_type:
             if msg.file_path:
-                body = f"[{msg.media_type}: {msg.file_path}]"
+                display = pathlib.Path(msg.file_path).name if filename_only else msg.file_path
+                body = f"[{msg.media_type}: {display}]"
             else:
                 body = f"[{msg.media_type} (файл недоступен)]"
         else:
@@ -42,7 +49,13 @@ def format_messages(
         line = f"[{ts}] {sender}:\n{body}"
 
         if msg.reactions:
-            line += f"\n  Реакции: {' '.join(msg.reactions)}"
+            parts = [
+                f"{r['emoji']} ({r['count']})"
+                for r in msg.reactions
+                if isinstance(r, dict) and r.get("count", 0) > 0
+            ]
+            if parts:
+                line += f"\n  Реакции: {' '.join(parts)}"
 
         lines.append(line)
 

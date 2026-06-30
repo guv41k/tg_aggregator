@@ -2,6 +2,7 @@ import logging
 from datetime import datetime
 
 from sqlalchemy.orm import Session, selectinload
+from sqlalchemy.orm.attributes import flag_modified
 
 from db.models import Chat, Message, User
 
@@ -90,6 +91,57 @@ def get_messages_by_period(
         )
     except Exception:
         logger.exception("Ошибка при выборке сообщений chat_id=%s", chat_id)
+        raise
+
+
+def update_message_reactions(
+    session: Session,
+    chat_id: int,
+    message_id: int,
+    old_emojis: list[str],
+    new_emojis: list[str],
+) -> None:
+    """Обновить реакции сообщения с учётом delta: убрать old_emojis, добавить new_emojis.
+
+    Реакции хранятся как [{"emoji": "🔥", "count": N}].
+    """
+    try:
+        msg = (
+            session.query(Message)
+            .filter(Message.id == message_id, Message.chat_id == chat_id)
+            .first()
+        )
+        if msg is None:
+            logger.debug(
+                "Реакция пришла на несохранённое сообщение %s в чате %s",
+                message_id,
+                chat_id,
+            )
+            return
+
+        counts: dict[str, int] = {
+            r["emoji"]: r["count"]
+            for r in (msg.reactions or [])
+            if isinstance(r, dict)
+        }
+
+        for emoji in old_emojis:
+            counts[emoji] = max(0, counts.get(emoji, 0) - 1)
+        for emoji in new_emojis:
+            counts[emoji] = counts.get(emoji, 0) + 1
+
+        msg.reactions = [
+            {"emoji": e, "count": c} for e, c in counts.items() if c > 0
+        ]
+        flag_modified(msg, "reactions")
+        session.commit()
+    except Exception:
+        session.rollback()
+        logger.exception(
+            "Ошибка при обновлении реакций сообщения %s в чате %s",
+            message_id,
+            chat_id,
+        )
         raise
 
 
