@@ -1,6 +1,8 @@
 import asyncio
 import logging
 
+from telegram import Update
+
 from admin_bot import build_admin_app
 from collector import build_collector_app
 from db.session import init_db
@@ -23,7 +25,12 @@ async def main() -> None:
         await collector_app.start()
         await admin_app.start()
 
-        await collector_app.updater.start_polling(drop_pending_updates=True)
+        # allowed_updates обязателен для коллектора: по умолчанию Telegram не шлёт
+        # message_reaction и message_reaction_count, если они не указаны явно.
+        await collector_app.updater.start_polling(
+            drop_pending_updates=True,
+            allowed_updates=list(Update.ALL_TYPES),
+        )
         await admin_app.updater.start_polling(drop_pending_updates=True)
 
         logger.info("Оба бота запущены. Нажми Ctrl+C для остановки.")
