@@ -43,9 +43,9 @@ def upsert_chat(session: Session, chat_data: dict) -> Chat:
 
 
 def save_message(session: Session, message_data: dict) -> Message:
-    """Пропускает сообщение если уже сохранено (idempotent)."""
+    """Пропускает сообщение, если оно уже сохранено в этом чате."""
     try:
-        msg = session.get(Message, message_data["id"])
+        msg = session.get(Message, (message_data["chat_id"], message_data["id"]))
         if msg is not None:
             return msg
         msg = Message(
@@ -100,11 +100,7 @@ def update_message_reactions(
 ) -> None:
     """Delta-обновление: убрать old_emojis, добавить new_emojis. Формат: [{"emoji": "🔥", "count": N}]."""
     try:
-        msg = (
-            session.query(Message)
-            .filter(Message.id == message_id, Message.chat_id == chat_id)
-            .first()
-        )
+        msg = session.get(Message, (chat_id, message_id))
         if msg is None:
             logger.debug(
                 "Реакция пришла на несохранённое сообщение %s в чате %s",

@@ -29,8 +29,8 @@ class Chat(Base):
 class Message(Base):
     __tablename__ = "messages"
 
-    id = Column(BigInteger, primary_key=True)  # Telegram message_id (внутри чата не уникален глобально)
-    chat_id = Column(BigInteger, ForeignKey("chats.id"), nullable=False)
+    chat_id = Column(BigInteger, ForeignKey("chats.id"), primary_key=True)
+    id = Column(BigInteger, primary_key=True)  # Telegram message_id уникален только внутри чата
     user_id = Column(BigInteger, ForeignKey("users.id"), nullable=True)
     text = Column(Text, nullable=True)
     media_type = Column(String(50), nullable=True)   # photo, document, video, …
