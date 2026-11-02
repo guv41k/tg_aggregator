@@ -40,3 +40,6 @@ jobs:
 
       - name: Check application imports
         run: python -c 'import main; import db.models'
+
+      - name: Run unit tests
+        run: python -m unittest discover -s tests -t . -v
