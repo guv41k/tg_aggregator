@@ -28,7 +28,7 @@ async def main() -> None:
         # allowed_updates обязателен для коллектора: по умолчанию Telegram не шлёт
         # message_reaction и message_reaction_count, если они не указаны явно.
         await collector_app.updater.start_polling(
-            drop_pending_updates=True,
+            drop_pending_updates=False,
             allowed_updates=list(Update.ALL_TYPES),
         )
         await admin_app.updater.start_polling(drop_pending_updates=True)
